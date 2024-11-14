@@ -40,6 +40,7 @@ export default function CarListing() {
     const loadCars = async () => {
       try {
         const carsData = await fetchCars();
+        console.log(carsData);
         setCars(carsData);
         setFilteredCars(carsData);
       } catch (err) {
@@ -53,11 +54,19 @@ export default function CarListing() {
 
   useEffect(() => {
     setFilteredCars(
-      cars.filter(car =>
-        car.model.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    )
-  }, [searchTerm, cars])
+      cars.filter(car => {
+        const searchTermLower = searchTerm.toLowerCase();
+  
+        const modelMatch = car.model.toLowerCase().includes(searchTermLower);
+        const descriptionMatch = car.description.toLowerCase().includes(searchTermLower);
+        const featuresMatch = car.features.some(feature =>
+          feature.toLowerCase().includes(searchTermLower)
+        );
+  
+        return modelMatch || descriptionMatch || featuresMatch;
+      })
+    );
+  }, [searchTerm, cars]);
 
   const handleAddCar = () => {
     router.push('/Pages/carcreation')

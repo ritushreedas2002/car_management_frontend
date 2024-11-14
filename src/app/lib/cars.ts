@@ -40,6 +40,7 @@ export interface Car {
 export const fetchCars = async () => {
     try {
         const response = await axios.get('/api/cars/list');
+        console.log(response.data.cars);
         return response.data.cars;
     } catch (error) {
         console.error('Error in fetchCars:', error);

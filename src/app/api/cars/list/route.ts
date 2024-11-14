@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
             }
         });
 
+        
         if (response.status === 200) {
             return NextResponse.json(
                 { 
