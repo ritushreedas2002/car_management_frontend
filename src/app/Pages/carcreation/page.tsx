@@ -1,29 +1,35 @@
+
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { createCar } from '@/app/lib/cars'
 
 export default function CarCreation() {
   const router = useRouter()
   const [images, setImages] = useState<string[]>([])
+  const [imageUrlInput, setImageUrlInput] = useState('')
+  const [featuresInput, setFeaturesInput] = useState('') // State for the raw features input
   const [formData, setFormData] = useState({
     model: '',
     price: '',
-    year: new Date().getFullYear(),
+    year: new Date().getFullYear().toString(),
     mileage: '',
     fuelType: '',
     transmission: '',
     description: '',
-    features: ''
+    features: [] as string[],
+    images: [] as string[]
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -36,39 +42,76 @@ export default function CarCreation() {
     setErrors(prev => ({ ...prev, [name]: '' }))
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      const newImages = Array.from(files).map(file => URL.createObjectURL(file))
-      setImages(prev => [...prev, ...newImages])
+  const handleAddImageUrl = () => {
+    if (images.length >= 10) {
+      alert('You can only add up to 10 images.');
+      return;
+    }
+    if (imageUrlInput.trim() !== '') {
+      setImages(prev => [...prev, imageUrlInput.trim()])
+      setFormData(prev => ({ ...prev, images: [...prev.images, imageUrlInput.trim()] }))
+      setImageUrlInput('')
     }
   }
 
   const removeImage = (index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index))
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }))
   }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     if (!formData.model.trim()) newErrors.model = 'Model is required'
-    if (!formData.price.trim()) newErrors.price = 'Price is required'
-    if (!formData.year) newErrors.year = 'Year is required'
-    if (!formData.mileage.trim()) newErrors.mileage = 'Mileage is required'
+    if (!formData.price.toString().trim()) newErrors.price = 'Price is required'
+    if (!formData.year.trim()) newErrors.year = 'Year is required'
+    if (!formData.mileage.toString().trim()) newErrors.mileage = 'Mileage is required'
     if (!formData.fuelType) newErrors.fuelType = 'Fuel type is required'
     if (!formData.transmission) newErrors.transmission = 'Transmission is required'
     if (!formData.description.trim()) newErrors.description = 'Description is required'
-    if (images.length === 0) newErrors.images = 'At least one image is required'
+    // Check if features are parsed
+    if (formData.features.length === 0) newErrors.features = 'At least one feature is required'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFeaturesInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFeaturesInput(e.target.value)
+    setErrors(prev => ({ ...prev, features: '' }))
+  }
+
+  const parseFeatures = () => {
+    const featuresArray = featuresInput
+      .split(',')
+      .map(feature => feature.trim())
+      .filter(feature => feature !== '')
+    setFormData(prev => ({ ...prev, features: featuresArray }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    parseFeatures()
     if (validateForm()) {
-      // Here you would typically send the data to your backend
-      console.log('Form data:', { ...formData, images })
-      // Redirect to the car listing page or show a success message
-      router.push('/cars')
+      try {
+        setIsSubmitting(true)
+        const carData = {
+          ...formData,
+          price: Number(formData.price),
+          year: Number(formData.year),
+          mileage: Number(formData.mileage),
+        }
+
+        const response = await createCar(carData)
+        console.log('Car created successfully:', response)
+        router.push('/Pages/carlisting')
+      } catch (error) {
+        console.error('Error creating car:', error)
+        setErrors(prev => ({ ...prev, submit: 'Failed to create car. Please try again.' }))
+      } finally {
+        setIsSubmitting(false)
+      }
     }
   }
 
@@ -80,8 +123,9 @@ export default function CarCreation() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
+            {/* Images Section */}
             <div className="space-y-2">
-              <Label htmlFor="images">Images</Label>
+              <Label htmlFor="imageUrlInput">Images</Label>
               <div className="flex flex-wrap gap-4">
                 {images.map((image, index) => (
                   <div key={index} className="relative">
@@ -97,23 +141,23 @@ export default function CarCreation() {
                     </Button>
                   </div>
                 ))}
-                <Label
-                  htmlFor="image-upload"
-                  className="w-24 h-24 border-2 border-dashed border-gray-300 rounded flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors"
-                >
-                  <Input
-                    id="image-upload"
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
-                  <Upload className="h-6 w-6 text-gray-400" />
-                </Label>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  id="imageUrlInput"
+                  type="text"
+                  value={imageUrlInput}
+                  onChange={(e) => setImageUrlInput(e.target.value)}
+                  placeholder="Enter image URL"
+                />
+                <Button type="button" onClick={handleAddImageUrl}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Image
+                </Button>
               </div>
               {errors.images && <p className="text-sm text-red-500">{errors.images}</p>}
             </div>
+
+            {/* Model and Price */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="model">Model</Label>
@@ -138,6 +182,10 @@ export default function CarCreation() {
                 />
                 {errors.price && <p className="text-sm text-red-500">{errors.price}</p>}
               </div>
+            </div>
+
+            {/* Year and Mileage */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="year">Year</Label>
                 <Input
@@ -162,9 +210,17 @@ export default function CarCreation() {
                 />
                 {errors.mileage && <p className="text-sm text-red-500">{errors.mileage}</p>}
               </div>
+            </div>
+
+            {/* Fuel Type and Transmission */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fuelType">Fuel Type</Label>
-                <Select name="fuelType" value={formData.fuelType} onValueChange={(value) => handleSelectChange('fuelType', value)}>
+                <Select
+                  name="fuelType"
+                  value={formData.fuelType}
+                  onValueChange={(value) => handleSelectChange('fuelType', value)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select fuel type" />
                   </SelectTrigger>
@@ -179,7 +235,11 @@ export default function CarCreation() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="transmission">Transmission</Label>
-                <Select name="transmission" value={formData.transmission} onValueChange={(value) => handleSelectChange('transmission', value)}>
+                <Select
+                  name="transmission"
+                  value={formData.transmission}
+                  onValueChange={(value) => handleSelectChange('transmission', value)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select transmission type" />
                   </SelectTrigger>
@@ -192,6 +252,8 @@ export default function CarCreation() {
                 {errors.transmission && <p className="text-sm text-red-500">{errors.transmission}</p>}
               </div>
             </div>
+
+            {/* Description */}
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
@@ -204,19 +266,41 @@ export default function CarCreation() {
               />
               {errors.description && <p className="text-sm text-red-500">{errors.description}</p>}
             </div>
+
+            {/* Features */}
             <div className="space-y-2">
               <Label htmlFor="features">Features (comma-separated)</Label>
               <Input
                 id="features"
                 name="features"
-                value={formData.features}
-                onChange={handleInputChange}
-                placeholder="e.g. Autopilot, 360° Camera, 15&quot; Touchscreen"
+                value={featuresInput}
+                onChange={handleFeaturesInputChange}
+                placeholder='e.g. Autopilot, 360° Camera, 15" Touchscreen'
               />
+              {errors.features && <p className="text-sm text-red-500">{errors.features}</p>}
+              {formData.features.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {formData.features.map((feature, index) => (
+                    <span
+                      key={index}
+                      className="bg-gray-100 px-2 py-1 rounded-md text-sm"
+                    >
+                      {feature}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full">Create Listing</Button>
+            {errors.submit && <p className="text-sm text-red-500 mb-2">{errors.submit}</p>}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Creating...' : 'Create Listing'}
+            </Button>
           </CardFooter>
         </form>
       </Card>

@@ -2,7 +2,6 @@
 import { useRouter } from 'next/navigation';
 import SignUpForm from '@/app/components/User/SignUpForm';
 import { registerUser } from '../../lib/api';
-import { setAuthToken } from '../../lib/auth';
 import { useState } from 'react';
 
 const SignUp: React.FC = () => {
@@ -11,8 +10,8 @@ const SignUp: React.FC = () => {
 
   const handleSignUp = async (username: string, email: string, password: string) => {
     try {
-      const { token } = await registerUser(username, email, password);
-      setAuthToken(token);
+       await registerUser(username, email, password);
+
       router.push('/Pages/login');
     } catch (err) {
       if (err instanceof Error) {
